@@ -1,0 +1,18 @@
+[package]
+name = "kmer_selector"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "kmer_selector"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rayon = "1.12.0"
+rand = "0.8"
+
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+[[bin]]
+name = "kmer_selector_cli"
+path = "src/main.rs"

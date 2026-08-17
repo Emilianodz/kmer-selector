@@ -1,0 +1,10 @@
+/target
+.venv/
+__pycache__/
+*.pyd
+*.so
+data/*.txt
+data/*.tsv
+data/*.bin
+!data/.gitkeep
+.streamlit/
