@@ -1,21 +1,12 @@
-mod io;
-mod neighbors;
-mod clustering;
-mod filter;
-mod export;
-mod selection;
-
-use filter::FilterConfig;
-use selection::{PanelConfig, GcBin, SelectionStrategy, DeficitStrategy};
 use kmer_selector::{io, clustering, filter, export, selection};
 use filter::FilterConfig;
 use selection::{PanelConfig, GcBin, SelectionStrategy, DeficitStrategy};
 
 // ─── Configuración centralizada ───────────────────────────────
 const K: usize = 13;
-const MAX_DIST: u32 = 2;
+const MAX_DIST: u32 = 1;
 const DEFAULT_INPUT_TSV: &str = "data/kmers.tsv";
-const OUTPUT_TSV: &str = "data/kmers_selected.tsv";
+const OUTPUT_TSV: &str = "data/probes_selected.tsv";
 const PANEL_OUTPUT_TSV: &str = "data/final_panel.tsv";
 
 fn build_filter_config() -> FilterConfig {
@@ -36,7 +27,7 @@ fn build_panel_config() -> PanelConfig {
         ],
         strategy: SelectionStrategy::WeightedByEntropy,
         deficit: DeficitStrategy::Redistribute,
-        seed: Some(42), // fijo mientras validas; None para producción real
+        seed: Some(42),
     }
 }
 // ────────────────────────────────────────────────────────────
@@ -53,13 +44,15 @@ fn main() {
     };
     println!("Candidatos leídos: {}", candidates.len());
 
-    let filter_config = build_filter_config();
-    let filtered = filter::apply_filter(candidates, &filter_config);
-    println!("Candidatos tras filtro GC/entropía: {}", filtered.len());
-
     let start = std::time::Instant::now();
-    let components = clustering::select_representatives(&filtered, K, MAX_DIST);
+    let components = clustering::select_representatives(&candidates, K, MAX_DIST);
     println!("Clustering: {} componentes ({:?})", components.len(), start.elapsed());
+
+    //temporal
+    let sizes: Vec<usize> = components.iter().map(|c| c.size).collect();
+    let max_size = sizes.iter().max().unwrap_or(&0);
+    let total_in_largest = *max_size as f64 / candidates.len() as f64 * 100.0;
+    println!("Componente más grande: {} miembros ({:.1}% del total)", max_size, total_in_largest);
 
     match export::export_components(&components, K, OUTPUT_TSV) {
         Ok(()) => println!("Componentes exportados a {}", OUTPUT_TSV),

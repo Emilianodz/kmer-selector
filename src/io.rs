@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::Path;
@@ -10,7 +9,7 @@ pub struct ProbeCandidate {
     pub count: u32,
     pub gc_content: f32,
     pub entropy: f32,
-    pub files: HashSet<u32>,
+    pub files: Vec<u32>,
 }
 
 
@@ -71,7 +70,7 @@ fn parse_line(line: &str, k: usize) -> Result<ProbeCandidate, String> {
     let files = fields[5]
         .split(',')
         .map(|id| id.parse::<u32>().map_err(|e| e.to_string()))
-        .collect::<Result<HashSet<u32>, String>>()?;
+        .collect::<Result<Vec<u32>, String>>()?;
 
     Ok(ProbeCandidate { code, count, gc_content: gc, entropy, files })
 }
@@ -110,8 +109,6 @@ mod tests {
 
     #[test]
     fn shannon_entropy_max_for_uniform_distribution() {
-        // k=4 con las 4 bases distintas → entropía máxima = log2(4) = 2.0
-        // code = A C G T = 00 01 10 11 → 0b11100100 (orden depende de tu encode_kmer)
         let code: u64 = 0b11_10_01_00;
         let e = shannon_entropy(code, 4);
         assert!((e - 2.0).abs() < 1e-5);
@@ -119,7 +116,6 @@ mod tests {
 
     #[test]
     fn shannon_entropy_zero_for_homogeneous_kmer() {
-        // todo A (00) → entropía 0
         let code: u64 = 0;
         let e = shannon_entropy(code, 13);
         assert!(e.abs() < 1e-5);
@@ -127,24 +123,21 @@ mod tests {
 
     #[test]
     fn gc_content_all_at() {
-        // A=00, T=11 → ninguna es GC
-        let code: u64 = 0b11_00_11_00; // A T A T
+        let code: u64 = 0b11_00_11_00;
         let gc = gc_content(code, 4);
         assert_eq!(gc, 0.0);
     }
 
     #[test]
     fn gc_content_all_gc() {
-        // C=01, G=10 → ambas son GC
-        let code: u64 = 0b10_01_10_01; // C G C G
+        let code: u64 = 0b10_01_10_01;
         let gc = gc_content(code, 4);
         assert_eq!(gc, 1.0);
     }
 
     #[test]
     fn decode_kmer_roundtrip_with_gc_content() {
-        // ATG codificado y decodificado debe regresar "ATG"
-        let code = 0b00_11_10u64; // A=00, T=11, G=10 en orden
+        let code = 0b00_11_10u64;
         assert_eq!(decode_kmer(code, 3), "ATG");
     }
 
@@ -156,7 +149,7 @@ mod tests {
         assert_eq!(c.count, 42);
         assert_eq!(c.gc_content, 0.5);
         assert_eq!(c.entropy, 1.8);
-        assert_eq!(c.files, HashSet::from([1, 2, 3]));
+        assert_eq!(c.files, vec![1, 2, 3]);
     }
 
     #[test]

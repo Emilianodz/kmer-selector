@@ -76,6 +76,41 @@ kmer_selector/
 - **`probes_selected.tsv`**: full candidate table with an extra `selected` column, produced by the Streamlit app's export step. Same column layout as `kmer_counter`'s TSV output plus selection metadata.
 - **`dataset.txt`**: plain list of selected probe sequences, one per line, with no additional columns.
 
+## Optional: batched clustering for very large datasets (console only)
+
+For datasets dense enough to trigger percolation in the Hamming-neighbor
+graph (see notes below), a standalone binary performs clustering in
+randomly-shuffled batches, iterating until the candidate set is small
+enough for a single safe clustering pass.
+
+This tool is console-only and intentionally not exposed to the Python
+bindings or the Streamlit app -- it's meant for one-off preprocessing of
+unusually large or dense datasets before the normal pipeline is used.
+
+Build and run:
+
+    cargo build --release --bin batch_cluster
+    ./target/release/batch_cluster <input.tsv> [k=13] [max_dist=1] [seed=42] [batch_size=auto]
+
+Intermediate results are written to `data/intermediate_pass*.tsv` and are
+NOT deleted automatically -- they're kept for inspection/reproducibility.
+The final reduced result is written to `data/probes_selected.tsv`, in the
+same format consumed by the rest of the pipeline (e.g. loadable back into
+the Streamlit app for filtering and panel selection).
+
+### Why this exists
+
+At high candidate density relative to the k-mer space (4^k), the
+Hamming-distance neighbor graph can percolate: nearly all candidates end
+up transitively connected into a single giant component, even though no
+individual pair is directly similar to more than a handful of others.
+Batched clustering keeps each pass below the percolation threshold by
+processing randomly-shuffled subsets independently, then re-clustering
+the surviving representatives -- trading some transitive connections
+across batches (which tend to represent long, biologically meaningless
+chains rather than true redundancy) for a tractable, memory-bounded
+result.
+
 ## Author
 
 Developed by Emiliano Díaz-López

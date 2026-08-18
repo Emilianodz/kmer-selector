@@ -1,14 +1,13 @@
-use std::collections::HashSet;
-
 /// Genera todos los códigos que difieren de `code` en 1 hasta `max_dist`
+/// posiciones (distancia de Hamming), dado un k-mero de longitud `k`.
 pub fn neighbors_within(code: u64, k: usize, max_dist: u32) -> Vec<u64> {
-    let mut neighbors = HashSet::new();
+    let mut neighbors = Vec::new();
     for dist in 1..=(max_dist as usize) {
         for positions in positions_combinations(k, dist) {
             apply_substitutions(code, k, &positions, &mut neighbors);
         }
     }
-    neighbors.into_iter().collect()
+    neighbors
 }
 
 /// Todas las combinaciones de `dist` posiciones distintas dentro de 0..k
@@ -33,13 +32,13 @@ fn combine(start: usize, k: usize, dist: usize, current: &mut Vec<usize>, result
 
 /// Para un conjunto de posiciones dado, genera todos los códigos resultantes
 /// de sustituir cada posición por sus 3 bases alternativas
-fn apply_substitutions(code: u64, k: usize, positions: &[usize], out: &mut HashSet<u64>) {
+fn apply_substitutions(code: u64, k: usize, positions: &[usize], out: &mut Vec<u64>) {
     substitute_recursive(code, k, positions, 0, out);
 }
 
-fn substitute_recursive(code: u64, k: usize, positions: &[usize], idx: usize, out: &mut HashSet<u64>) {
+fn substitute_recursive(code: u64, k: usize, positions: &[usize], idx: usize, out: &mut Vec<u64>) {
     if idx == positions.len() {
-        out.insert(code);
+        out.push(code);
         return;
     }
     let pos = positions[idx];
@@ -56,10 +55,11 @@ fn substitute_recursive(code: u64, k: usize, positions: &[usize], idx: usize, ou
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn counts_39_neighbors_at_distance_1_for_k13() {
-        let code: u64 = 0; // todo A
+        let code: u64 = 0;
         let neighbors = neighbors_within(code, 13, 1);
         assert_eq!(neighbors.len(), 39);
     }
@@ -68,12 +68,12 @@ mod tests {
     fn counts_741_neighbors_up_to_distance_2_for_k13() {
         let code: u64 = 0;
         let neighbors = neighbors_within(code, 13, 2);
-        assert_eq!(neighbors.len(), 741); // 39 + 702
+        assert_eq!(neighbors.len(), 741);
     }
 
     #[test]
     fn does_not_include_original_code() {
-        let code: u64 = 0b1011_0100; // algún k-mero arbitrario, k=4
+        let code: u64 = 0b1011_0100;
         let neighbors = neighbors_within(code, 4, 2);
         assert!(!neighbors.contains(&code));
     }
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn combine_generates_expected_position_pairs() {
         let combos = positions_combinations(4, 2);
-        assert_eq!(combos.len(), 6); // C(4,2) = 6
+        assert_eq!(combos.len(), 6);
         assert!(combos.contains(&vec![0, 1]));
         assert!(combos.contains(&vec![2, 3]));
     }

@@ -66,7 +66,7 @@ fn select_final_panel(
             representative_entropy: entropy,
             size,
             members: vec![code],
-            files: HashSet::new(),
+            files: Vec::new(),
         })
         .collect();
 

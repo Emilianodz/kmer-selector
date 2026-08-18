@@ -38,7 +38,7 @@ mod tests {
     use std::collections::HashSet;
 
     fn make_candidate(gc: f32, entropy: f32) -> ProbeCandidate {
-        ProbeCandidate { code: 0, count: 1, gc_content: gc, entropy, files: HashSet::new() }
+        ProbeCandidate { code: 0, count: 1, gc_content: gc, entropy, files: Vec::new() }
     }
 
     #[test]

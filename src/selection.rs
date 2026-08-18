@@ -6,7 +6,7 @@ use crate::clustering::Component;
 pub struct GcBin {
     pub min_gc: f32,
     pub max_gc: f32,
-    pub proportion: f32, //target_size, ej. 0.5 = 50%
+    pub proportion: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -18,8 +18,8 @@ pub enum SelectionStrategy {
 
 #[derive(Clone, Copy)]
 pub enum DeficitStrategy {
-    Strict,        // panel final puede quedar incompleto que target_size seleccionado
-    Redistribute,  // el caso se utocompleta si hay faltantes con los segmentos excedentes
+    Strict,
+    Redistribute,
 }
 
 pub struct PanelConfig {
@@ -27,12 +27,12 @@ pub struct PanelConfig {
     pub bins: Vec<GcBin>,
     pub strategy: SelectionStrategy,
     pub deficit: DeficitStrategy,
-    pub seed: Option<u64>, // tests
+    pub seed: Option<u64>,
 }
 
 pub struct PanelResult {
-    pub selected: Vec<u64>,    // selecciones para el panel final
-    pub eliminated: Vec<u64>,  // palabras descartadas en rojo
+    pub selected: Vec<u64>,
+    pub eliminated: Vec<u64>,
 }
 
 pub fn select_panel(components: &[Component], config: &PanelConfig) -> PanelResult {
@@ -41,7 +41,6 @@ pub fn select_panel(components: &[Component], config: &PanelConfig) -> PanelResu
         None => StdRng::from_entropy(),
     };
 
-    // 1. Agrupar representantes por bin de GC
     let mut bin_members: Vec<Vec<&Component>> = vec![Vec::new(); config.bins.len()];
     for c in components {
         if let Some(idx) = config.bins.iter().position(|b| {
@@ -51,17 +50,14 @@ pub fn select_panel(components: &[Component], config: &PanelConfig) -> PanelResu
         }
     }
 
-    // 2. Cuota inicial por bin, según proporción configurada
     let mut quotas: Vec<usize> = config.bins.iter()
         .map(|b| (config.target_size as f32 * b.proportion).round() as usize)
         .collect();
 
-    // 3. Redistribución de déficit, si se pidió
     if matches!(config.deficit, DeficitStrategy::Redistribute) {
         redistribute_deficit(&mut quotas, &bin_members);
     }
 
-    // 4. Selección ponderada dentro de cada bin
     let mut selected_ids: HashSet<u64> = HashSet::new();
     for (i, members) in bin_members.iter().enumerate() {
         let quota = quotas[i].min(members.len());
@@ -104,7 +100,6 @@ fn redistribute_deficit(quotas: &mut [usize], bin_members: &[Vec<&Component>]) {
             }
         }
     }
-    // Si no hay excedente suficiente en ningún otro bin, el déficit el panel queda más chico
 }
 
 fn weighted_sample<'a>(
@@ -121,10 +116,6 @@ fn weighted_sample<'a>(
         }
     };
 
-    // Calculo de llave, importancia de selección
-    // A-ExpJ: llave = u^(1/peso) con u ~ Uniforme(0,1). Tomar los `quota`
-    // candidatos con mayor llave da muestreo ponderado sin reemplazo --
-    // con Random (peso=1.0 fijo) esto se reduce exactamente a shuffle + take.
     let mut keyed: Vec<(f32, &Component)> = members.iter()
         .map(|&c| {
             let u: f32 = rng.gen_range(0.0001..1.0);
@@ -141,7 +132,6 @@ fn weighted_sample<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clustering::Component;
 
     fn make_component(code: u64, gc: f32, entropy: f32, count: u32) -> Component {
         Component {
@@ -151,7 +141,7 @@ mod tests {
             representative_entropy: entropy,
             size: 1,
             members: vec![code],
-            files,
+            files: Vec::new(),
         }
     }
 
@@ -176,8 +166,6 @@ mod tests {
 
     #[test]
     fn redistributes_deficit_to_surplus_bin() {
-        // Bin bajo GC con solo 5 candidatos pero cuota de 25 (déficit=20)
-        // Bin alto GC con 100 candidatos, cuota base 25, excedente=75
         let mut components: Vec<Component> = (0..5)
             .map(|i| make_component(i, 0.2, 1.5, 1))
             .collect();
@@ -195,8 +183,6 @@ mod tests {
         };
 
         let result = select_panel(&components, &config);
-        // El bin bajo solo aporta sus 5 disponibles; el resto del target
-        // (45) debe salir del bin alto vía redistribución.
         assert_eq!(result.selected.len(), 50);
     }
 
@@ -215,13 +201,13 @@ mod tests {
         };
 
         let result = select_panel(&components, &config);
-        assert_eq!(result.selected.len(), 5); // no hay más de 5 disponibles
+        assert_eq!(result.selected.len(), 5);
     }
 
     #[test]
     fn weighted_by_entropy_strongly_prefers_high_entropy() {
-        let mut components = vec![make_component(0, 0.5, 0.01, 1)]; // entropía casi nula
-        components.extend((1..50).map(|i| make_component(i, 0.5, 2.0, 1))); // entropía alta
+        let mut components = vec![make_component(0, 0.5, 0.01, 1)];
+        components.extend((1..50).map(|i| make_component(i, 0.5, 2.0, 1)));
 
         let config = PanelConfig {
             target_size: 5,
@@ -232,8 +218,6 @@ mod tests {
         };
 
         let result = select_panel(&components, &config);
-        // Con peso tan desigual, es extremadamente improbable que el
-        // candidato de entropía casi nula (code=0) sea elegido.
         assert!(!result.selected.contains(&0));
     }
 

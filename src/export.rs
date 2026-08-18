@@ -93,7 +93,7 @@ mod tests {
             representative_entropy: 1.8,
             size: 3,
             members: vec![0, 1, 4],
-            files: HashSet::new(),
+            files: Vec::new(),
         }];
 
         let path = "test_export_output.tsv";

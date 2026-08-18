@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import kmer_selector
 import tempfile, os
+from collections import Counter
 
 st.set_page_config(page_title="Diseño de sondas k-mer", layout="wide")
 st.title("Diseño de panel de sondas")
@@ -182,17 +183,42 @@ else:
                 use_container_width=True
             )
         with cd:
-            long_panel = df_panel.assign(id_genoma=df_panel["files_csv"].str.split(",")).explode("id_genoma")
-            long_panel = long_panel[long_panel["id_genoma"] != ""]
+            
 
-            coverage = long_panel.groupby("id_genoma")["selected"].agg(
-                total="count", seleccionadas="sum"
-            ).reset_index()
-            coverage["eliminadas"] = coverage["total"] - coverage["seleccionadas"]
+            sel_counts = Counter()
+            elim_counts = Counter()
+
+            for files_str, is_selected in zip(df_panel["files_csv"], df_panel["selected"]):
+                if not files_str:
+                    continue
+                ids = files_str.split(",")
+                if is_selected:
+                    sel_counts.update(ids)
+                else:
+                    elim_counts.update(ids)
+
+            all_genomes = sorted(
+                set(sel_counts) | set(elim_counts),
+                key=lambda g: int(g) if g.isdigit() else g
+            )
+
+            # Si hay demasiados genomas distintos, el eje X se satura --
+            # muestra solo los N con menor proporción de sondas seleccionadas
+            # (los casos más relevantes para detectar sesgo).
+            MAX_GENOMES_SHOWN = 60
+            if len(all_genomes) > MAX_GENOMES_SHOWN:
+                def selected_ratio(g):
+                    total = sel_counts.get(g, 0) + elim_counts.get(g, 0)
+                    return sel_counts.get(g, 0) / total if total > 0 else 1.0
+                all_genomes = sorted(all_genomes, key=selected_ratio)[:MAX_GENOMES_SHOWN]
+                st.caption(f"Mostrando los {MAX_GENOMES_SHOWN} genomas con menor proporción de sondas seleccionadas.")
+
+            seleccionadas = [sel_counts.get(g, 0) for g in all_genomes]
+            eliminadas = [elim_counts.get(g, 0) for g in all_genomes]
 
             fig_cov = go.Figure()
-            fig_cov.add_trace(go.Bar(x=coverage["id_genoma"], y=coverage["seleccionadas"], name="Seleccionadas", marker_color="#1f77b4"))
-            fig_cov.add_trace(go.Bar(x=coverage["id_genoma"], y=coverage["eliminadas"], name="Eliminadas", marker_color="#d62728"))
+            fig_cov.add_trace(go.Bar(x=all_genomes, y=seleccionadas, name="Seleccionadas", marker_color="#1f77b4"))
+            fig_cov.add_trace(go.Bar(x=all_genomes, y=eliminadas, name="Eliminadas", marker_color="#d62728"))
             fig_cov.update_layout(barmode="stack", title="Cobertura de sondas por genoma (panel final)",
                                    xaxis_title="Genoma (ID)", yaxis_title="Sondas")
             st.plotly_chart(fig_cov, use_container_width=True)
